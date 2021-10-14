@@ -3,6 +3,7 @@ import sys
 import random
 import numpy as np
 import itertools
+import math
 '''
 I want to create a few projects that I will list below and elaborate with some detail. I'll be working on them 
 sequentially because they will build on each other or just complement each other well. 
@@ -26,6 +27,8 @@ entire map and discover the entire map.
 
 BLACK = (0, 0, 0)
 WHITE = (255, 255, 255)
+CURRENT_COL = (255, 0, 255) # Magenta
+END_COL = (0, 128, 128) # Magenta
 WINDOW_HEIGHT = 800
 WINDOW_WIDTH = 800
 GRID = (15, 15)
@@ -49,21 +52,46 @@ def draw_grid():
             SCREEN.blit(surf, loc)
             surfs[loc] = surf
 
-def take_step():
+def dist(current, node):
+    return math.sqrt(sum((np.array(current) - np.array(node))**2))
+
+def take_step(diag=True):
     '''
-    Here I am going to run the actual A* algorithm and update the position of the cursor block
+    Here I am going to run the actual A* algorithm and update the position of the cursor block.
+    Diagonal steps allowed
     '''
-    pass
+    global f, g, h
+    if diag:
+        neighbour_list = [(current_loc[0] + row, current_loc[1] + col) for row, col in itertools.product([-1, 0, 1], [-1, 0, 1]) if (row, col) in open_list]
+        distance_tup = sorted([(neighbour, dist(current_loc, neighbour)) for neighbour in neighbour_list], key=lambda distance: distance[1])
+    else:
+        raise NotImplementedError
+    for neighbour, distance in distance_tup:
+        test_path = path.copy()
+        test_path.append(neighbour)
+        g = sum([dist(loc_0, loc_1) for loc_0, loc_1 in [(test_path[loc], test_path[loc + 1]) for loc in range(len(test_path)-1)]]) # todo watch out for bug here lol
+        h = dist(current_loc, end_loc)
+        f[neighbour] = g + h
+    f = sorted(f.items(), key=lambda val: val[1])
+    next_step = f[0]
+
 
 def main():
-    global SCREEN, CLOCK, current_loc, end_loc
+    global SCREEN, CLOCK, current_loc, end_loc, open_list, closed_list, f, g, h, path
     pygame.init()
     SCREEN = pygame.display.set_mode((WINDOW_WIDTH, WINDOW_HEIGHT))
+    pygame.display.set_caption('A* Pathfinding Visualization')
     CLOCK = pygame.time.Clock()
     SCREEN.fill(WHITE)
 
     current_loc = random.choice([(row, col) for row, col in itertools.product(range(GRID[0]), range(GRID[1])) if CELL_COLOURS[row][col]])
     end_loc = random.choice([(row, col) for row, col in itertools.product(range(GRID[0]), range(GRID[1])) if CELL_COLOURS[row][col]])
+    open_list = [(row, col) for row, col in itertools.product(GRID) if CELL_COLOURS[row][col]]
+    closed_list = [(row, col) for row, col in itertools.product(GRID) if not CELL_COLOURS[row][col]]
+    open_list.append(end_loc) if end_loc not in open_list else None
+    f = {}
+    g = 0
+    path = [current_loc]
     while True:
         pygame.time.delay(100)
         draw_grid()
