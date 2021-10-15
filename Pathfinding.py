@@ -45,9 +45,11 @@ def draw_grid():
     for row in range(GRID[0]):
         for col in range(GRID[1]):
             surf = pygame.Surface((block_size, block_size))
-            random.seed(0)
             surf.fill(colours[CELL_COLOURS[row][col]])
-            surf.fill((200, 200, 0)) if current_loc == (row, col) else surf.fill((0, 200, 200)) if end_loc == (row, col) else None
+            if current_loc == (row, col):
+                surf.fill(CURRENT_COL)
+            elif end_loc == (row, col):
+                surf.fill(END_COL)
             loc = (int(1.1*block_size*row + 0.1*block_size), int(1.1*block_size*col + 0.1*block_size))
             SCREEN.blit(surf, loc)
             surfs[loc] = surf
@@ -60,24 +62,44 @@ def take_step(diag=True):
     Here I am going to run the actual A* algorithm and update the position of the cursor block.
     Diagonal steps allowed
     '''
-    global f, g, h
-    if diag:
-        neighbour_list = [(current_loc[0] + row, current_loc[1] + col) for row, col in itertools.product([-1, 0, 1], [-1, 0, 1]) if (row, col) in open_list]
-        distance_tup = sorted([(neighbour, dist(current_loc, neighbour)) for neighbour in neighbour_list], key=lambda distance: distance[1])
-    else:
-        raise NotImplementedError
-    for neighbour, distance in distance_tup:
-        test_path = path.copy()
-        test_path.append(neighbour)
-        g = sum([dist(loc_0, loc_1) for loc_0, loc_1 in [(test_path[loc], test_path[loc + 1]) for loc in range(len(test_path)-1)]]) # todo watch out for bug here lol
-        h = dist(current_loc, end_loc)
-        f[neighbour] = g + h
-    f = sorted(f.items(), key=lambda val: val[1])
-    next_step = f[0]
+    global f, g, current_loc, end_loc, open_list, path
+
+    while open_list:
+        # open_list.sort(key=lambda f_score: f.values())
+        current_loc = open_list.pop(0)
+        if diag:
+            neighbour_list = [(current_loc[0] + row, current_loc[1] + col) for row, col in itertools.product([-1, 0, 1], [-1, 0, 1]) if (current_loc[0] + row, current_loc[1] + col) in valid_list and (row, col) != (0, 0)]
+        else:
+            raise NotImplementedError
+        for neighbour in neighbour_list:
+            if neighbour == end_loc:
+                quit()
+            test_g = g[current_loc] + dist(current_loc, neighbour)
+            if test_g < g[neighbour]:
+                path.append(neighbour)
+                g[neighbour] = test_g
+                f[neighbour] = test_g + dist(neighbour, end_loc)
+                open_list.append(neighbour) if neighbour not in open_list else None
+        break
+
+    # if diag:
+    #     neighbour_list = [(current_loc[0] + row, current_loc[1] + col) for row, col in itertools.product([-1, 0, 1], [-1, 0, 1]) if (row, col) in valid_list and (row, col) != (0, 0)]
+    #     distance_tup = sorted([(neighbour, dist(current_loc, neighbour)) for neighbour in neighbour_list], key=lambda distance: distance[1]) # I don't think I need to sort this one
+    # else:
+    #     raise NotImplementedError
+    # for neighbour, distance in distance_tup:
+    #     test_path = path.copy()
+    #     test_path.append(neighbour)
+    #     g = sum([dist(loc_0, loc_1) for loc_0, loc_1 in [(test_path[loc], test_path[loc + 1]) for loc in range(len(test_path)-1)]]) # todo watch out for bug here lol
+    #     h = dist(current_loc, end_loc)
+    #     f[neighbour] = g + h
+    # f_list = sorted(f.items(), key=lambda val: val[1])
+    # current_loc = f_list[0][0]
+    # return
 
 
 def main():
-    global SCREEN, CLOCK, current_loc, end_loc, open_list, closed_list, f, g, h, path
+    global SCREEN, CLOCK, current_loc, end_loc, valid_list, blocked_list, f, g, h, path, open_list
     pygame.init()
     SCREEN = pygame.display.set_mode((WINDOW_WIDTH, WINDOW_HEIGHT))
     pygame.display.set_caption('A* Pathfinding Visualization')
@@ -86,22 +108,26 @@ def main():
 
     current_loc = random.choice([(row, col) for row, col in itertools.product(range(GRID[0]), range(GRID[1])) if CELL_COLOURS[row][col]])
     end_loc = random.choice([(row, col) for row, col in itertools.product(range(GRID[0]), range(GRID[1])) if CELL_COLOURS[row][col]])
-    open_list = [(row, col) for row, col in itertools.product(GRID) if CELL_COLOURS[row][col]]
-    closed_list = [(row, col) for row, col in itertools.product(GRID) if not CELL_COLOURS[row][col]]
-    open_list.append(end_loc) if end_loc not in open_list else None
-    f = {}
-    g = 0
-    path = [current_loc]
+    valid_list = [(row, col) for row, col in itertools.product(range(GRID[0]), range(GRID[1])) if CELL_COLOURS[row][col]]
+    blocked_list = [(row, col) for row, col in itertools.product(range(GRID[0]), range(GRID[1])) if not CELL_COLOURS[row][col]]
+    valid_list.append(end_loc) if end_loc not in valid_list else None
+    valid_list.remove(current_loc)
+    g = {key: float('inf') for key in valid_list}
+    g[current_loc] = 0
+    f = {key: float('inf') for key in valid_list}
+    f[current_loc] = dist(current_loc, end_loc)
+    path = []
+    open_list = [current_loc] # maybe come back but I think this should be fine for now
     while True:
-        pygame.time.delay(100)
+        pygame.time.delay(200)
         draw_grid()
         take_step()
+        pygame.display.update()
+
         for event in pygame.event.get():
             if event.type == pygame.QUIT:
                 pygame.quit()
                 sys.exit()
-
-        pygame.display.update()
 
 if __name__ == '__main__':
     main()
