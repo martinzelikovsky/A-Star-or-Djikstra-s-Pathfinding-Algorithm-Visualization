@@ -27,32 +27,49 @@ entire map and discover the entire map.
 
 BLACK = (0, 0, 0)
 WHITE = (255, 255, 255)
-CURRENT_COL = (255, 0, 255) # Magenta
-END_COL = (0, 128, 128) # Magenta
+GREEN = (0, 200, 0)
+GREY = (105, 105, 105)
+CURRENT_COL = (0, 128, 128) # Teal
+END_COL = (255, 0, 255) # Magenta
 WINDOW_HEIGHT = 800
 WINDOW_WIDTH = 800
-GRID = (15, 15)
-CELL_COLOURS = np.random.choice(2, GRID, p=[0.15, 0.85])
-
-
-
+GRID = (60, 60)
+CELL_COLOURS = np.random.choice(2, GRID, p=[0.35, 0.65])
+BLOCK_SIZE = int(WINDOW_HEIGHT / (1.1 * GRID[0]))  # Set the size of the grid block
 
 
 def draw_grid():
-    block_size = int(WINDOW_HEIGHT/(1.1*GRID[0])) #Set the size of the grid block
     surfs = {}
     colours = (BLACK, WHITE)
     for row in range(GRID[0]):
         for col in range(GRID[1]):
-            surf = pygame.Surface((block_size, block_size))
+            surf = pygame.Surface((BLOCK_SIZE, BLOCK_SIZE))
             surf.fill(colours[CELL_COLOURS[row][col]])
             if current_loc == (row, col):
                 surf.fill(CURRENT_COL)
             elif end_loc == (row, col):
                 surf.fill(END_COL)
-            loc = (int(1.1*block_size*row + 0.1*block_size), int(1.1*block_size*col + 0.1*block_size))
+            loc = (int(1.1 * BLOCK_SIZE * row + 0.1 * BLOCK_SIZE), int(1.1 * BLOCK_SIZE * col + 0.1 * BLOCK_SIZE))
             SCREEN.blit(surf, loc)
             surfs[loc] = surf
+    if path_list:
+        destination = pygame.Surface((BLOCK_SIZE, BLOCK_SIZE))
+        destination.fill(CURRENT_COL)
+        loc = (int(1.1 * BLOCK_SIZE * current_loc[0] + 0.1 * BLOCK_SIZE), int(1.1 * BLOCK_SIZE * current_loc[1] + 0.1 * BLOCK_SIZE))
+        SCREEN.blit(destination, loc)
+        for row, col in path_list:
+            path_tile = pygame.Surface((BLOCK_SIZE, BLOCK_SIZE))
+            path_tile.fill(GREEN)
+            loc = (int(1.1 * BLOCK_SIZE * row + 0.1 * BLOCK_SIZE), int(1.1 * BLOCK_SIZE * col + 0.1 * BLOCK_SIZE))
+            SCREEN.blit(path_tile, loc)
+
+
+def draw_path():
+    global current_loc, path, path_list
+    path_list = []
+    while current_loc in path.keys():
+        current_loc = path[current_loc]
+        path_list.insert(0, current_loc)
 
 def dist(current, node):
     return math.sqrt(sum((np.array(current) - np.array(node))**2))
@@ -62,24 +79,26 @@ def take_step(diag=True):
     Here I am going to run the actual A* algorithm and update the position of the cursor block.
     Diagonal steps allowed
     '''
-    global f, g, current_loc, end_loc, open_list, path
+    global f, g, current_loc, end_loc, open_list, analyzed_list, path
 
     while open_list:
         # open_list.sort(key=lambda f_score: f.values())
-        current_loc = open_list.pop(0)
+        open_list.sort(key=lambda val: val[1])
+        current_loc = open_list.pop(0)[0] # this needs to get sorted by fscore
+        if current_loc == end_loc:
+            draw_path()
         if diag:
             neighbour_list = [(current_loc[0] + row, current_loc[1] + col) for row, col in itertools.product([-1, 0, 1], [-1, 0, 1]) if (current_loc[0] + row, current_loc[1] + col) in valid_list and (row, col) != (0, 0)]
         else:
             raise NotImplementedError
         for neighbour in neighbour_list:
-            if neighbour == end_loc:
-                quit()
             test_g = g[current_loc] + dist(current_loc, neighbour)
             if test_g < g[neighbour]:
-                path.append(neighbour)
+                path[neighbour] = current_loc
+                analyzed_list.append(neighbour)
                 g[neighbour] = test_g
                 f[neighbour] = test_g + dist(neighbour, end_loc)
-                open_list.append(neighbour) if neighbour not in open_list else None
+                open_list.append((neighbour, f[neighbour])) if neighbour not in [open_list[0] for _ in open_list] else None
         break
 
     # if diag:
@@ -99,7 +118,7 @@ def take_step(diag=True):
 
 
 def main():
-    global SCREEN, CLOCK, current_loc, end_loc, valid_list, blocked_list, f, g, h, path, open_list
+    global SCREEN, CLOCK, current_loc, end_loc, valid_list, blocked_list, f, g, h, analyzed_list, open_list, path, path_list
     pygame.init()
     SCREEN = pygame.display.set_mode((WINDOW_WIDTH, WINDOW_HEIGHT))
     pygame.display.set_caption('A* Pathfinding Visualization')
@@ -116,12 +135,14 @@ def main():
     g[current_loc] = 0
     f = {key: float('inf') for key in valid_list}
     f[current_loc] = dist(current_loc, end_loc)
-    path = []
-    open_list = [current_loc] # maybe come back but I think this should be fine for now
+    analyzed_list = []
+    path = {}
+    path_list = None
+    open_list = [(current_loc, dist(current_loc, end_loc))] # maybe come back but I think this should be fine for now
     while True:
-        pygame.time.delay(200)
+        pygame.time.delay(30)
         draw_grid()
-        take_step()
+        take_step() if not path_list else None
         pygame.display.update()
 
         for event in pygame.event.get():
